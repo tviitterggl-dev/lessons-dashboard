@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Учёт занятий</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #faf6f0;
+    --bg-grad: radial-gradient(circle at 15% 0%, #fdf1e2 0%, #faf6f0 42%);
+    --card-bg: #fffdfa;
+    --text: #2b211a;
+    --muted: #8a7a6b;
+    --border: #ead9c4;
+    --accent: #c1621f;
+    --accent-2: #8a4a26;
+    --accent-soft: #fbe6cd;
+    --done-bg: #eef1df;
+    --done-border: #c7d0a3;
+    --done-text: #4f6b2a;
+    --pending-bg: #fdecd2;
+    --pending-border: #f0c98a;
+    --pending-text: #8a5a1a;
+    --danger: #b3402a;
+    --danger-bg: #fbe6df;
+    --danger-border: #eab7a4;
+    --shadow: 0 1px 2px rgba(90, 55, 20, 0.04), 0 6px 20px -8px rgba(120, 70, 20, 0.18);
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1712; --bg-grad: radial-gradient(circle at 15% 0%, #2a1f14 0%, #1c1712 45%);
+      --card-bg: #251e17; --text: #f2e9dd; --muted: #ab9885;
+      --border: #3c3024; --accent: #e08a3e; --accent-2: #f0a75c; --accent-soft: #3a2a17;
+      --done-bg: #29301c; --done-border: #465228; --done-text: #b8cf85;
+      --pending-bg: #3a2c14; --pending-border: #6b4f1f; --pending-text: #edc27e;
+      --danger: #e08b74; --danger-bg: #3a231c; --danger-border: #6b3a2a;
+      --shadow: 0 1px 2px rgba(0,0,0,0.2), 0 6px 20px -8px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1712; --bg-grad: radial-gradient(circle at 15% 0%, #2a1f14 0%, #1c1712 45%);
+    --card-bg: #251e17; --text: #f2e9dd; --muted: #ab9885;
+    --border: #3c3024; --accent: #e08a3e; --accent-2: #f0a75c; --accent-soft: #3a2a17;
+    --done-bg: #29301c; --done-border: #465228; --done-text: #b8cf85;
+    --pending-bg: #3a2c14; --pending-border: #6b4f1f; --pending-text: #edc27e;
+    --danger: #e08b74; --danger-bg: #3a231c; --danger-border: #6b3a2a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.2), 0 6px 20px -8px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Inter", -apple-system, "Segoe UI", Arial, sans-serif;
+    background: var(--bg) var(--bg-grad);
+    color: var(--text);
+    padding: 20px 14px 44px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  h1 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 3px;
+  }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 18px; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  .login-card { text-align: center; padding: 34px 18px; }
+  .login-card p { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+  .tabs, .subtabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    background: var(--accent-soft);
+    padding: 4px;
+    border-radius: 12px;
+  }
+  .subtabs { margin-bottom: 12px; padding: 3px; border-radius: 10px; }
+  .tab, .subtab {
+    flex: 1;
+    text-align: center;
+    padding: 8px 6px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: var(--accent-2);
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .subtab { font-size: 12px; padding: 6px 6px; border-radius: 7px; }
+  .tab.active, .subtab.active { background: var(--accent); color: #fff8f0; box-shadow: 0 2px 8px -2px rgba(193, 98, 31, 0.5); }
+
+  .week-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .week-nav button {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--accent-2);
+    border-radius: 10px;
+    padding: 7px 13px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .week-label {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 14.5px;
+    text-align: center;
+    flex: 1;
+  }
+
+  .range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .range-row input[type="date"] {
+    flex: 1;
+    min-width: 130px;
+    padding: 7px 8px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .range-row .dash { color: var(--muted); }
+
+  .status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 11.5px;
+  }
+  .badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .badge.ok { color: var(--done-text); border-color: var(--done-border); background: var(--done-bg); }
+  .badge.warn { color: var(--pending-text); border-color: var(--pending-border); background: var(--pending-bg); }
+  .badge.err { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); }
+
+  .rates-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .rates-row .meta { font-size: 12px; color: var(--muted); }
+  .btn {
+    border: none;
+    background: var(--accent);
+    color: #fff8f0;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px -2px rgba(193, 98, 31, 0.45);
+  }
+  .btn:disabled { opacity: 0.5; box-shadow: none; cursor: default; }
+  .btn.secondary { background: var(--accent-soft); color: var(--accent-2); box-shadow: none; }
+  .btn.block { width: 100%; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  .lesson {
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 12px 13px;
+    margin-bottom: 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .lesson.done { background: var(--done-bg); border-color: var(--done-border); }
+  .lesson.past-unmarked { border-color: var(--pending-border); }
+  .lesson-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .lesson-when { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+  .lesson-name { font-weight: 600; font-size: 14.5px; }
+  .lesson-name .unmatched { color: var(--pending-text); font-weight: 400; font-size: 12px; }
+  .lesson-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .rate-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .rate-field input {
+    width: 78px;
+    padding: 5px 7px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 13px;
+  }
+  .mark-btn {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    border-radius: 9px;
+    padding: 6px 11px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .mark-btn.done { background: var(--done-text); border-color: var(--done-text); color: #fdfef6; }
+  .mark-btn:disabled { opacity: 0.5; }
+
+  .totals {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13.5px;
+  }
+  .totals .big {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 22px 0; }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+
+  .stat-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .stat-tile {
+    flex: 1;
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .stat-tile .num {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: var(--accent-2);
+    display: block;
+  }
+  .stat-tile .lbl { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+
+  .compare-row {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .compare-row .delta { font-weight: 600; }
+  .compare-row .delta.up { color: var(--done-text); }
+  .compare-row .delta.down { color: var(--danger); }
+
+  .student-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .student-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 11px 13px;
+    cursor: pointer;
+  }
+  .student-head .name { font-weight: 600; font-size: 14px; }
+  .student-head .agg { font-size: 12px; color: var(--muted); }
+  .student-head .chev { color: var(--muted); font-size: 12px; transition: transform 0.15s; }
+  .student-card.open .chev { transform: rotate(90deg); }
+  .student-body {
+    display: none;
+    padding: 0 13px 11px;
+    border-top: 1px solid var(--border);
+  }
+  .student-card.open .student-body { display: block; }
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .session-row:last-child { border-bottom: none; }
+  .session-row .when { color: var(--text); font-weight: 500; }
+  .session-row .amt { font-family: "Space Grotesk", sans-serif; color: var(--accent-2); font-weight: 600; white-space: nowrap; }
+
+  .student-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .student-row:last-child { border-bottom: none; }
+  .student-row .name { font-weight: 600; font-size: 14px; }
+  .student-row .cls { font-size: 11.5px; color: var(--muted); }
+  .student-row .rate { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--accent-2); font-size: 14px; }
+
+  .chart-title { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 13px; margin-bottom: 10px; color: var(--text); }
+  #trendChart svg rect { fill: var(--accent); }
+  #trendChart svg text { fill: var(--muted); font-family: "Inter", sans-serif; }
+  #trendChart svg text.val { fill: var(--accent-2); font-family: "Space Grotesk", sans-serif; font-weight: 600; }
+
+  .sched-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.sched {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+  }
+  table.sched th, table.sched td {
+    border: 1px solid var(--border);
+    text-align: center;
+    padding: 6px 3px;
+    font-size: 11px;
+  }
+  table.sched thead th {
+    background: var(--accent);
+    color: #fff8f0;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    padding: 8px 3px;
+  }
+  table.sched thead th.time-col { background: var(--accent-2); }
+  table.sched td.time-col {
+    background: var(--accent-soft);
+    color: var(--accent-2);
+    font-weight: 600;
+    white-space: nowrap;
+    font-family: "Space Grotesk", sans-serif;
+  }
+  table.sched td.busy { background: var(--pending-bg); color: var(--pending-text); }
+  table.sched td.free { background: var(--done-bg); color: var(--done-text); }
+
+  .logout-link {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Учёт занятий и заработка</h1>
+  <div class="sub">Прямая связь с Google Calendar и Google Таблицами · отмечай проведённые — сумма считается сама</div>
+
+  <!-- ВХОД -->
+  <div class="card login-card" id="loginCard">
+    <p>Нужно войти в свой Google-аккаунт, чтобы дашборд увидел календарь и таблицу ставок.</p>
+    <button class="btn" id="loginBtn" disabled>Войти через Google</button>
+  </div>
+
+  <div id="appRoot" style="display:none">
+    <div class="card">
+      <div class="status-row" id="statusRow">
+        <span class="badge" id="calBadge">Календарь: …</span>
+        <span class="badge" id="ratesBadge">Ставки: …</span>
+        <button class="logout-link" id="logoutBtn">выйти</button>
+      </div>
+      <div class="rates-row">
+        <div class="meta" id="ratesMeta">Ставки не загружены</div>
+        <button class="btn secondary" id="refreshRatesBtn">Обновить цены</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab" data-tab="lessons">Занятия</div>
+      <div class="tab" data-tab="summary">Итоги</div>
+      <div class="tab" data-tab="students">Ученики</div>
+      <div class="tab" data-tab="schedule">Расписание</div>
+    </div>
+
+    <!-- ЗАНЯТИЯ -->
+    <div class="tabview" id="view-lessons">
+      <div class="card">
+        <div class="subtabs">
+          <div class="subtab" data-lessonmode="day">День</div>
+          <div class="subtab" data-lessonmode="week">Неделя</div>
+        </div>
+
+        <div id="dayWeekNav" class="week-nav">
+          <button id="prevBtn">‹</button>
+          <div class="week-label" id="weekLabel">—</div>
+          <button id="nextBtn">›</button>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn secondary" id="markPastBtn">Отметить все прошедшие</button>
+        </div>
+
+        <div id="lessonsList"><div class="empty">Загрузка…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="totals">
+          <div>Проведено занятий: <b id="doneCount">0</b></div>
+          <div>Заработано: <span class="big" id="doneSum">0 ₽</span></div>
+        </div>
+        <div class="hint">В сумму идут только отмеченные «Провёл». Если ставка не найдена — впиши сумму вручную, тогда занятие можно отметить. Цена фиксируется в момент отметки — если позже поднимешь ставку, старые занятия не пересчитаются. Отметки хранятся в этом браузере (localStorage) — на другом устройстве или после очистки данных сайта они не видны.</div>
+      </div>
+    </div>
+
+    <!-- ИТОГИ -->
+    <div class="tabview" id="view-summary" style="display:none">
+      <div class="card">
+        <div class="subtabs">
+          <div class="subtab" data-summode="week">Неделя</div>
+          <div class="subtab" data-summode="month">Месяц</div>
+          <div class="subtab" data-summode="range">Период</div>
+        </div>
+
+        <div id="summaryNav" class="week-nav">
+          <button id="summaryPrevBtn">‹</button>
+          <div class="week-label" id="summaryLabel">—</div>
+          <button id="summaryNextBtn">›</button>
+        </div>
+
+        <div id="summaryRangeNav" class="range-row" style="display:none">
+          <input type="date" id="summaryRangeStart">
+          <span class="dash">—</span>
+          <input type="date" id="summaryRangeEnd">
+          <button class="btn" id="summaryRangeGoBtn">Показать</button>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-tile"><span class="num" id="statCount">0</span><span class="lbl">занятий</span></div>
+          <div class="stat-tile"><span class="num" id="statHours">0</span><span class="lbl">часов</span></div>
+          <div class="stat-tile"><span class="num" id="statSum">0 ₽</span><span class="lbl">заработано</span></div>
+        </div>
+        <div class="compare-row" id="compareRow"></div>
+
+        <div class="btn-row">
+          <button class="btn secondary block" id="copySummaryBtn">Скопировать итоги</button>
+        </div>
+
+        <div id="studentsSummaryList"><div class="empty">Загрузка…</div></div>
+        <div class="hint">Только отмеченные «Провёл». Нажми на ученика, чтобы посмотреть занятия.</div>
+      </div>
+
+      <div class="card">
+        <div class="chart-title">Динамика дохода · последние 6 месяцев</div>
+        <div id="trendChart"><div class="empty">Загрузка…</div></div>
+        <div class="hint">Только отмеченные «Провёл» занятия, по месяцу проведения.</div>
+      </div>
+    </div>
+
+    <!-- УЧЕНИКИ -->
+    <div class="tabview" id="view-students" style="display:none">
+      <div class="card">
+        <div id="studentsRosterList"><div class="empty">Загрузка…</div></div>
+        <div class="hint">Список и ставки из таблицы «Ставки учеников». Обновляется кнопкой «Обновить цены» сверху.</div>
+      </div>
+    </div>
+
+    <!-- РАСПИСАНИЕ -->
+    <div class="tabview" id="view-schedule" style="display:none">
+      <div class="card">
+        <div id="schedNav" class="week-nav">
+          <button id="schedPrevBtn">‹</button>
+          <div class="week-label" id="schedLabel">—</div>
+          <button id="schedNextBtn">›</button>
+        </div>
+        <div class="sched-wrap">
+          <table class="sched" id="schedTable"></table>
+        </div>
+        <div class="hint">Учтены занятия из календаря «Занятия» и личные события из основного календаря — жёлтое занято, зелёное свободно.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const CLIENT_ID = "1089841743767-dp27f56bhf78o0tsp2qvscjpgl1jmvmn.apps.googleusercontent.com";
+  const SCOPES = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets.readonly";
+  const RATES_FILE_ID = "1j0COVy9NUDOIumoGfJfTUYnV84c7jJ_rzFp1M3obORs";
+  const LESSONS_CALENDAR_ID = "676742127252c358d9ad3f9bd85e2965176875b1aeb2d7fa65cd4341361d4397@group.calendar.google.com";
+
+  let tokenClient = null;
+  let accessToken = null;
+
+  let activeTab = "lessons"; // lessons | summary | students | schedule
+
+  let rates = [];
+  let ratesMeta = null;
+
+  // Занятия (день/неделя)
+  let lessonMode = "week"; // day | week
+  let dayOffset = 0;
+  let weekOffset = 0;
+  let events = [];
+  let marks = {};
+  let pollTimer = null;
+
+  // Итоги
+  let summaryMode = "week"; // week | month | range
+  let summaryWeekOffset = 0;
+  let summaryMonthOffset = 0;
+  let summaryEvents = [];
+  let lastStats = null;
+
+  // Расписание
+  let schedWeekOffset = 0;
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- АВТОРИЗАЦИЯ ----------
+
+  function saveToken(resp) {
+    accessToken = resp.access_token;
+    const expiresAt = Date.now() + (Number(resp.expires_in || 3600) * 1000) - 60000;
+    try { localStorage.setItem("gtoken", JSON.stringify({ token: accessToken, expiresAt })); } catch (e) { /* ignore */ }
+  }
+  function loadStoredToken() {
+    try {
+      const raw = localStorage.getItem("gtoken");
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data.expiresAt > Date.now()) return data.token;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function clearToken() {
+    accessToken = null;
+    try { localStorage.removeItem("gtoken"); } catch (e) { /* ignore */ }
+  }
+
+  function showLoginScreen() {
+    $("loginCard").style.display = "block";
+    $("appRoot").style.display = "none";
+  }
+  function showApp() {
+    $("loginCard").style.display = "none";
+    $("appRoot").style.display = "block";
+  }
+
+  function handleAuthExpired() {
+    clearToken();
+    stopPoll();
+    showLoginScreen();
+  }
+
+  function initGis() {
+    if (typeof google === "undefined" || !google.accounts) {
+      setTimeout(initGis, 200);
+      return;
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) {
+          $("loginBtn").textContent = "Не удалось войти, попробуй ещё раз";
+          return;
+        }
+        saveToken(resp);
+        afterAuth();
+      },
+    });
+    $("loginBtn").disabled = false;
+    $("loginBtn").textContent = "Войти через Google";
+  }
+
+  $("loginBtn").addEventListener("click", () => {
+    if (!tokenClient) return;
+    tokenClient.requestAccessToken();
+  });
+  $("logoutBtn").addEventListener("click", () => {
+    stopPoll();
+    clearToken();
+    showLoginScreen();
+  });
+
+  async function afterAuth() {
+    showApp();
+    await loadRatesFromCache();
+    renderRatesMeta();
+    if (!rates.length) await refreshRates();
+    showTab("lessons");
+  }
+
+  // ---------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДАТ ----------
+
+  function mondayOf(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function fmtISO(d) {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T00:00:00+03:00`;
+  }
+  function fmtDayLabel(d) {
+    const days = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
+    const p = (n) => String(n).padStart(2, "0");
+    return `${days[d.getDay()]} ${p(d.getDate())}.${p(d.getMonth() + 1)}`;
+  }
+  function fmtShort(d) {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
+  }
+  function toDateInputValue(d) {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  function fmtHours(h) {
+    const rounded = Math.round(h * 10) / 10;
+    return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1).replace(".", ",");
+  }
+
+  const MONTHS_RU = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+  const MONTHS_SHORT_RU = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+
+  function getLessonRange() {
+    if (lessonMode === "day") {
+      const base = new Date();
+      base.setDate(base.getDate() + dayOffset);
+      base.setHours(0, 0, 0, 0);
+      const end = new Date(base);
+      end.setDate(base.getDate() + 1);
+      return { start: base, end, label: fmtDayLabel(base) };
+    }
+    const base = new Date();
+    base.setDate(base.getDate() + weekOffset * 7);
+    const mon = mondayOf(base);
+    const nextMon = new Date(mon);
+    nextMon.setDate(mon.getDate() + 7);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return { start: mon, end: nextMon, label: `${fmtDayLabel(mon)} – ${fmtDayLabel(sun)}` };
+  }
+
+  function getSummaryRange(offsetWeeks, offsetMonths) {
+    if (summaryMode === "week") {
+      const base = new Date();
+      base.setDate(base.getDate() + offsetWeeks * 7);
+      const mon = mondayOf(base);
+      const nextMon = new Date(mon);
+      nextMon.setDate(mon.getDate() + 7);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return { start: mon, end: nextMon, label: `${fmtDayLabel(mon)} – ${fmtDayLabel(sun)}` };
+    }
+    if (summaryMode === "month") {
+      const base = new Date();
+      base.setDate(1);
+      base.setMonth(base.getMonth() + offsetMonths);
+      const start = new Date(base.getFullYear(), base.getMonth(), 1);
+      const end = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+      return { start, end, label: `${MONTHS_RU[start.getMonth()]} ${start.getFullYear()}` };
+    }
+    const sVal = $("summaryRangeStart").value;
+    const eVal = $("summaryRangeEnd").value;
+    if (!sVal || !eVal) return null;
+    const start = new Date(sVal + "T00:00:00");
+    const end = new Date(eVal + "T00:00:00");
+    end.setDate(end.getDate() + 1);
+    return { start, end, label: `${fmtShort(start)} – ${fmtShort(new Date(end.getTime() - 86400000))}` };
+  }
+
+  function getPrevSummaryRange(current) {
+    if (summaryMode === "week") return getSummaryRange(summaryWeekOffset - 1, 0);
+    if (summaryMode === "month") return getSummaryRange(0, summaryMonthOffset - 1);
+    const lenMs = current.end - current.start;
+    const prevEnd = new Date(current.start.getTime());
+    const prevStart = new Date(current.start.getTime() - lenMs);
+    return { start: prevStart, end: prevEnd, label: "" };
+  }
+
+  function parseLesson(summary) {
+    const m = (summary || "").match(/^([А-ЯЁа-яё]+)\s+(\d{1,2})\s*класс/iu);
+    if (!m) return null;
+    return { name: m[1], cls: parseInt(m[2], 10) };
+  }
+  function findRate(name, cls) {
+    const nlow = name.toLowerCase();
+    const row = rates.find(r => r.name.toLowerCase() === nlow && r.cls === cls);
+    return row ? row.rate : null;
+  }
+  function studentKey(ev) {
+    const parsed = parseLesson(ev.summary || "");
+    return parsed ? `${parsed.name}, ${parsed.cls} класс` : (ev.summary || "Без названия");
+  }
+
+  // overrideAmount всегда побеждает; иначе, если занятие уже отмечено —
+  // используется ставка, зафиксированная в момент отметки (lockedRate),
+  // чтобы будущее изменение цены не переписывало прошлое.
+  function effectiveAmountFor(ev, mark) {
+    const m = mark || {};
+    if (m.overrideAmount != null) return m.overrideAmount;
+    if (m.marked && m.lockedRate != null) return m.lockedRate;
+    const parsed = parseLesson(ev.summary || "");
+    return parsed ? findRate(parsed.name, parsed.cls) : null;
+  }
+
+  function setBadge(el, text, cls) {
+    el.textContent = text;
+    el.className = "badge" + (cls ? " " + cls : "");
+  }
+
+  // ---------- ЗАПРОСЫ К GOOGLE API ----------
+
+  async function apiFetch(url) {
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + accessToken } });
+    if (res.status === 401) {
+      handleAuthExpired();
+      throw new Error("auth");
+    }
+    if (!res.ok) throw new Error("http " + res.status);
+    return res.json();
+  }
+
+  async function calendarFetch(calendarId, startISO, endISO) {
+    const url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(calendarId) +
+      "/events?timeMin=" + encodeURIComponent(startISO) +
+      "&timeMax=" + encodeURIComponent(endISO) +
+      "&singleEvents=true&orderBy=startTime&timeZone=Europe%2FMoscow&maxResults=250";
+    const data = await apiFetch(url);
+    return (data.items || []).filter(e => e.start && (e.start.dateTime || e.start.date));
+  }
+
+  async function fetchRatesFromSheet() {
+    const url = "https://sheets.googleapis.com/v4/spreadsheets/" + RATES_FILE_ID + "/values/A:D";
+    const data = await apiFetch(url);
+    const rows = (data.values || []).slice();
+    rows.shift(); // заголовок
+    return rows.map(r => ({
+      name: (r[0] || "").toString().trim(),
+      surname: (r[1] || "").toString().trim(),
+      cls: parseInt(r[2], 10),
+      rate: parseFloat((r[3] || "").toString().replace(",", ".")),
+    })).filter(r => r.name && !Number.isNaN(r.cls) && !Number.isNaN(r.rate));
+  }
+
+  // ---------- СТАВКИ ----------
+
+  async function loadRatesFromCache() {
+    try {
+      const raw = localStorage.getItem("rates_cache");
+      if (raw) {
+        const data = JSON.parse(raw);
+        rates = data.rows || [];
+        ratesMeta = { updatedAt: data.updatedAt };
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  async function refreshRates() {
+    $("refreshRatesBtn").disabled = true;
+    setBadge($("ratesBadge"), "Ставки: обновляю…", "warn");
+    try {
+      rates = await fetchRatesFromSheet();
+      ratesMeta = { updatedAt: Date.now() };
+      setBadge($("ratesBadge"), "Ставки: обновлены", "ok");
+      try { localStorage.setItem("rates_cache", JSON.stringify({ rows: rates, updatedAt: ratesMeta.updatedAt })); } catch (e) { /* ignore */ }
+      renderRatesMeta();
+      renderLessons();
+      renderStudentsRoster();
+    } catch (e) {
+      if (e.message !== "auth") setBadge($("ratesBadge"), "Ставки: ошибка", "err");
+    } finally {
+      $("refreshRatesBtn").disabled = false;
+    }
+  }
+
+  function renderRatesMeta() {
+    const n = rates.length;
+    const t = ratesMeta && ratesMeta.updatedAt
+      ? new Date(ratesMeta.updatedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "—";
+    $("ratesMeta").textContent = `${n} ставок · обновлено: ${t}`;
+  }
+
+  // ---------- ОТМЕТКИ (localStorage) ----------
+
+  function loadMarksFor(ids) {
+    ids.forEach(id => {
+      try {
+        const raw = localStorage.getItem("mark_" + id);
+        marks[id] = raw ? JSON.parse(raw) : (marks[id] || { marked: false, overrideAmount: null, lockedRate: null });
+      } catch (e) {
+        marks[id] = marks[id] || { marked: false, overrideAmount: null, lockedRate: null };
+      }
+    });
+  }
+
+  function saveMark(id, state) {
+    marks[id] = state;
+    try { localStorage.setItem("mark_" + id, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  async function toggleMark(ev, currentMark) {
+    const wasMarked = !!(currentMark && currentMark.marked);
+    const overrideAmount = currentMark ? currentMark.overrideAmount : null;
+    let lockedRate = currentMark ? currentMark.lockedRate : null;
+
+    if (!wasMarked) {
+      if (overrideAmount == null) {
+        const parsed = parseLesson(ev.summary || "");
+        lockedRate = parsed ? findRate(parsed.name, parsed.cls) : null;
+      }
+    }
+
+    const newState = { marked: !wasMarked, overrideAmount, lockedRate, updatedAt: Date.now() };
+    saveMark(ev.id, newState);
+    renderLessons();
+  }
+
+  function setOverride(ev, value) {
+    const amount = value === "" ? null : parseFloat(value);
+    const prev = marks[ev.id] || { marked: false, overrideAmount: null, lockedRate: null };
+    const newState = {
+      marked: prev.marked,
+      overrideAmount: Number.isNaN(amount) ? null : amount,
+      lockedRate: prev.lockedRate,
+      updatedAt: Date.now(),
+    };
+    saveMark(ev.id, newState);
+    renderLessons();
+  }
+
+  async function markAllPast() {
+    const now = new Date();
+    const btn = $("markPastBtn");
+    const toMark = events.filter(ev => {
+      const mark = marks[ev.id];
+      if (mark && mark.marked) return false;
+      const start = new Date(ev.start.dateTime || ev.start.date);
+      if (start > now) return false;
+      const amount = effectiveAmountFor(ev, mark);
+      return amount != null && !Number.isNaN(amount);
+    });
+    if (!toMark.length) return;
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = `Отмечаю ${toMark.length}…`;
+    toMark.forEach(ev => toggleMark(ev, marks[ev.id]));
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+
+  // ---------- ЗАНЯТИЯ ----------
+
+  function renderLessons() {
+    const range = getLessonRange();
+    $("weekLabel").textContent = range ? range.label : "—";
+
+    const list = $("lessonsList");
+    if (!events.length) {
+      list.innerHTML = '<div class="empty">Занятий нет</div>';
+      updateTotals();
+      return;
+    }
+
+    const now = new Date();
+    list.innerHTML = "";
+    events.forEach(ev => {
+      const start = new Date(ev.start.dateTime || ev.start.date);
+      const end = ev.end ? new Date(ev.end.dateTime || ev.end.date) : null;
+      const parsed = parseLesson(ev.summary || "");
+      const baseRate = parsed ? findRate(parsed.name, parsed.cls) : null;
+      const mark = marks[ev.id] || { marked: false, overrideAmount: null, lockedRate: null };
+      const effectiveAmount = effectiveAmountFor(ev, mark);
+      const canMark = effectiveAmount != null && !Number.isNaN(effectiveAmount);
+      const isPastUnmarked = !mark.marked && start < now;
+
+      const row = document.createElement("div");
+      row.className = "lesson" + (mark.marked ? " done" : "") + (isPastUnmarked ? " past-unmarked" : "");
+
+      const p = (n) => String(n).padStart(2, "0");
+      const timeStr = `${p(start.getHours())}:${p(start.getMinutes())}` + (end ? `–${p(end.getHours())}:${p(end.getMinutes())}` : "");
+      const dayStr = fmtDayLabel(start);
+
+      const nameHtml = parsed
+        ? `${parsed.name}, ${parsed.cls} класс` + (baseRate == null && !mark.marked ? ' <span class="unmatched">(ставка не найдена)</span>' : "")
+        : `${ev.summary || "Без названия"} <span class="unmatched">(не распознано)</span>`;
+
+      row.innerHTML = `
+        <div class="lesson-top">
+          <div class="lesson-name">${nameHtml}</div>
+          <div class="lesson-when">${dayStr}, ${timeStr}</div>
+        </div>
+        <div class="lesson-bottom">
+          <div class="rate-field">
+            ₽ <input type="number" inputmode="decimal" placeholder="${baseRate != null ? baseRate : "сумма"}" value="${mark.overrideAmount != null ? mark.overrideAmount : ""}">
+          </div>
+          <button class="mark-btn ${mark.marked ? "done" : ""}" ${canMark ? "" : "disabled"}>
+            ${mark.marked ? "✓ Провёл (снять)" : "Провёл занятие"}
+          </button>
+        </div>
+      `;
+
+      row.querySelector("input").addEventListener("change", (e) => setOverride(ev, e.target.value));
+      row.querySelector(".mark-btn").addEventListener("click", () => {
+        if (!canMark) return;
+        toggleMark(ev, mark);
+      });
+
+      list.appendChild(row);
+    });
+
+    updateTotals();
+  }
+
+  function updateTotals() {
+    let count = 0, sum = 0;
+    events.forEach(ev => {
+      const mark = marks[ev.id];
+      if (mark && mark.marked) {
+        const amount = effectiveAmountFor(ev, mark);
+        if (amount != null && !Number.isNaN(amount)) { count++; sum += amount; }
+      }
+    });
+    $("doneCount").textContent = String(count);
+    $("doneSum").textContent = sum.toLocaleString("ru-RU") + " ₽";
+  }
+
+  function stopPoll() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  async function loadLessonEvents() {
+    stopPoll();
+    const range = getLessonRange();
+    setBadge($("calBadge"), "Календарь: загрузка…", "warn");
+    $("lessonsList").innerHTML = '<div class="empty">Загрузка…</div>';
+
+    async function doFetch() {
+      try {
+        events = await calendarFetch(LESSONS_CALENDAR_ID, fmtISO(range.start), fmtISO(range.end));
+        setBadge($("calBadge"), "Календарь: подключен", "ok");
+        loadMarksFor(events.map(e => e.id));
+        renderLessons();
+      } catch (e) {
+        if (e.message !== "auth") setBadge($("calBadge"), "Календарь: ошибка", "err");
+      }
+    }
+    await doFetch();
+    pollTimer = setInterval(doFetch, 5 * 60 * 1000);
+  }
+
+  // ---------- ИТОГИ ----------
+
+  async function fetchRangeEvents(range) {
+    const evs = await calendarFetch(LESSONS_CALENDAR_ID, fmtISO(range.start), fmtISO(range.end));
+    loadMarksFor(evs.map(e => e.id));
+    return evs;
+  }
+
+  function computeStats(evs) {
+    const doneEvents = evs.filter(ev => marks[ev.id] && marks[ev.id].marked);
+    let totalMinutes = 0, totalSum = 0;
+    const byStudent = {};
+    doneEvents.forEach(ev => {
+      const start = new Date(ev.start.dateTime || ev.start.date);
+      const end = ev.end ? new Date(ev.end.dateTime || ev.end.date) : start;
+      const minutes = Math.max(0, (end - start) / 60000);
+      const mark = marks[ev.id];
+      const amount = effectiveAmountFor(ev, mark);
+      const key = studentKey(ev);
+
+      totalMinutes += minutes;
+      if (amount != null && !Number.isNaN(amount)) totalSum += amount;
+
+      if (!byStudent[key]) byStudent[key] = { count: 0, minutes: 0, sum: 0, sessions: [] };
+      byStudent[key].count++;
+      byStudent[key].minutes += minutes;
+      if (amount != null && !Number.isNaN(amount)) byStudent[key].sum += amount;
+      byStudent[key].sessions.push({ start, end, minutes, amount });
+    });
+    return { count: doneEvents.length, minutes: totalMinutes, sum: totalSum, byStudent };
+  }
+
+  async function loadSummary() {
+    const range = getSummaryRange(summaryWeekOffset, summaryMonthOffset);
+    $("summaryLabel").textContent = range ? range.label : "—";
+    if (!range) {
+      $("studentsSummaryList").innerHTML = '<div class="empty">Выбери даты периода</div>';
+      return;
+    }
+    $("studentsSummaryList").innerHTML = '<div class="empty">Загрузка…</div>';
+    $("compareRow").textContent = "";
+    try {
+      summaryEvents = await fetchRangeEvents(range);
+      const stats = computeStats(summaryEvents);
+      lastStats = { range, stats };
+      renderSummary(stats);
+
+      const prevRange = getPrevSummaryRange(range);
+      const prevEvents = await fetchRangeEvents(prevRange);
+      const prevStats = computeStats(prevEvents);
+      renderCompare(stats, prevStats);
+      loadMarksFor(summaryEvents.map(e => e.id));
+    } catch (e) {
+      if (e.message !== "auth") $("studentsSummaryList").innerHTML = '<div class="empty">Не удалось загрузить</div>';
+    }
+  }
+
+  function renderCompare(stats, prevStats) {
+    const el = $("compareRow");
+    if (!prevStats.sum && !stats.sum) { el.textContent = ""; return; }
+    if (!prevStats.sum) { el.textContent = "нет данных за прошлый период для сравнения"; return; }
+    const diff = stats.sum - prevStats.sum;
+    const pct = Math.round((diff / prevStats.sum) * 100);
+    const sign = diff >= 0 ? "+" : "";
+    const cls = diff >= 0 ? "up" : "down";
+    el.innerHTML = `<span class="delta ${cls}">${sign}${pct}%</span> к прошлому периоду (было ${prevStats.sum.toLocaleString("ru-RU")} ₽)`;
+  }
+
+  function renderSummary(stats) {
+    $("statCount").textContent = String(stats.count);
+    $("statHours").textContent = fmtHours(stats.minutes / 60);
+    $("statSum").textContent = stats.sum.toLocaleString("ru-RU") + " ₽";
+
+    const list = $("studentsSummaryList");
+    const keys = Object.keys(stats.byStudent).sort((a, b) => stats.byStudent[b].sum - stats.byStudent[a].sum);
+    if (!keys.length) {
+      list.innerHTML = '<div class="empty">Нет отмеченных занятий за этот период</div>';
+      return;
+    }
+
+    list.innerHTML = "";
+    keys.forEach(key => {
+      const s = stats.byStudent[key];
+      s.sessions.sort((a, b) => a.start - b.start);
+
+      const card = document.createElement("div");
+      card.className = "student-card";
+
+      const head = document.createElement("div");
+      head.className = "student-head";
+      head.innerHTML = `
+        <div>
+          <div class="name">${key}</div>
+          <div class="agg">${s.count} зан. · ${fmtHours(s.minutes / 60)} ч · ${s.sum.toLocaleString("ru-RU")} ₽</div>
+        </div>
+        <div class="chev">▸</div>
+      `;
+      head.addEventListener("click", () => card.classList.toggle("open"));
+
+      const body = document.createElement("div");
+      body.className = "student-body";
+      const p = (n) => String(n).padStart(2, "0");
+      body.innerHTML = s.sessions.map(sess => {
+        const d = fmtDayLabel(sess.start);
+        const t = `${p(sess.start.getHours())}:${p(sess.start.getMinutes())}–${p(sess.end.getHours())}:${p(sess.end.getMinutes())}`;
+        const h = fmtHours(sess.minutes / 60);
+        const amt = sess.amount != null ? sess.amount.toLocaleString("ru-RU") + " ₽" : "—";
+        return `<div class="session-row"><span class="when">${d}, ${t} (${h} ч)</span><span class="amt">${amt}</span></div>`;
+      }).join("");
+
+      card.appendChild(head);
+      card.appendChild(body);
+      list.appendChild(card);
+    });
+  }
+
+  function buildSummaryText() {
+    if (!lastStats) return "";
+    const { range, stats } = lastStats;
+    const lines = [];
+    lines.push(`Итоги за период: ${range.label}`);
+    lines.push(`Занятий: ${stats.count} · Часов: ${fmtHours(stats.minutes / 60)} · Заработано: ${stats.sum.toLocaleString("ru-RU")} ₽`);
+    lines.push("");
+    const keys = Object.keys(stats.byStudent).sort((a, b) => stats.byStudent[b].sum - stats.byStudent[a].sum);
+    keys.forEach(key => {
+      const s = stats.byStudent[key];
+      lines.push(`${key}: ${s.count} зан., ${fmtHours(s.minutes / 60)} ч, ${s.sum.toLocaleString("ru-RU")} ₽`);
+    });
+    return lines.join("\n");
+  }
+
+  async function copySummary() {
+    const text = buildSummaryText();
+    const btn = $("copySummaryBtn");
+    if (!text) return;
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch (e) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch (e2) { ok = false; }
+    }
+    const orig = btn.textContent;
+    btn.textContent = ok ? "Скопировано ✓" : "Не удалось скопировать";
+    setTimeout(() => { btn.textContent = orig; }, 1600);
+  }
+
+  function refreshSummary() {
+    $("summaryRangeNav").style.display = summaryMode === "range" ? "flex" : "none";
+    $("summaryNav").style.display = summaryMode === "range" ? "none" : "flex";
+    loadSummary();
+  }
+
+  // ---------- ДИНАМИКА ДОХОДА (график по месяцам) ----------
+
+  async function loadTrend() {
+    const el = $("trendChart");
+    el.innerHTML = '<div class="empty">Загрузка…</div>';
+
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ year: d.getFullYear(), month: d.getMonth(), label: MONTHS_SHORT_RU[d.getMonth()], sum: 0 });
+    }
+    const rangeStart = new Date(months[0].year, months[0].month, 1);
+    const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    try {
+      const evs = await calendarFetch(LESSONS_CALENDAR_ID, fmtISO(rangeStart), fmtISO(rangeEnd));
+      loadMarksFor(evs.map(e => e.id));
+      evs.forEach(ev => {
+        const mark = marks[ev.id];
+        if (!mark || !mark.marked) return;
+        const start = new Date(ev.start.dateTime || ev.start.date);
+        const amount = effectiveAmountFor(ev, mark);
+        if (amount == null || Number.isNaN(amount)) return;
+        const bucket = months.find(m => m.year === start.getFullYear() && m.month === start.getMonth());
+        if (bucket) bucket.sum += amount;
+      });
+      renderTrendChart(months);
+    } catch (e) {
+      if (e.message !== "auth") el.innerHTML = '<div class="empty">Не удалось загрузить</div>';
+    }
+  }
+
+  function renderTrendChart(months) {
+    const el = $("trendChart");
+    const max = Math.max(1, ...months.map(m => m.sum));
+    const w = 320, h = 150, padTop = 20, padBottom = 26, gap = 10;
+    const barW = (w - gap * (months.length + 1)) / months.length;
+
+    let svg = "";
+    months.forEach((m, i) => {
+      const barH = m.sum > 0 ? Math.max(2, (m.sum / max) * (h - padTop - padBottom)) : 0;
+      const x = gap + i * (barW + gap);
+      const y = h - padBottom - barH;
+      const valLabel = m.sum > 0 ? (m.sum >= 1000 ? Math.round(m.sum / 100) / 10 + "k" : String(Math.round(m.sum))) : "";
+      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="4"></rect>`;
+      svg += `<text class="val" x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-size="9.5">${valLabel}</text>`;
+      svg += `<text x="${(x + barW / 2).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="9.5">${m.label}</text>`;
+    });
+
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;">${svg}</svg>`;
+  }
+
+  // ---------- УЧЕНИКИ ----------
+
+  function renderStudentsRoster() {
+    const list = $("studentsRosterList");
+    if (!rates.length) {
+      list.innerHTML = '<div class="empty">Ставки не загружены</div>';
+      return;
+    }
+    const sorted = [...rates].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    list.innerHTML = sorted.map(r => `
+      <div class="student-row">
+        <div>
+          <div class="name">${r.name}${r.surname ? " " + r.surname : ""}</div>
+          <div class="cls">${r.cls} класс</div>
+        </div>
+        <div class="rate">${r.rate.toLocaleString("ru-RU")} ₽</div>
+      </div>
+    `).join("");
+  }
+
+  // ---------- РАСПИСАНИЕ ----------
+
+  function getSchedWeek() {
+    const base = new Date();
+    base.setDate(base.getDate() + schedWeekOffset * 7);
+    const mon = mondayOf(base);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      days.push(d);
+    }
+    const nextMon = new Date(mon);
+    nextMon.setDate(mon.getDate() + 7);
+    return { mon, nextMon, days };
+  }
+
+  const SCHED_START_HOUR = 8;
+  const SCHED_END_HOUR = 22;
+
+  async function loadSchedule() {
+    const week = getSchedWeek();
+    $("schedLabel").textContent = `${fmtShort(week.mon)} – ${fmtShort(week.days[6])}`;
+    $("schedTable").innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
+
+    try {
+      const [lessonsEvs, personalEvs] = await Promise.all([
+        calendarFetch(LESSONS_CALENDAR_ID, fmtISO(week.mon), fmtISO(week.nextMon)),
+        calendarFetch("primary", fmtISO(week.mon), fmtISO(week.nextMon)),
+      ]);
+      const allEvs = [...lessonsEvs, ...personalEvs].filter(e => e.start && e.start.dateTime && e.end && e.end.dateTime);
+      renderSchedule(week, allEvs);
+    } catch (e) {
+      if (e.message !== "auth") $("schedTable").innerHTML = '<tr><td class="empty">Не удалось загрузить</td></tr>';
+    }
+  }
+
+  function renderSchedule(week, evs) {
+    const busy = week.days.map(() => new Set());
+
+    evs.forEach(ev => {
+      const start = new Date(ev.start.dateTime);
+      const end = new Date(ev.end.dateTime);
+      week.days.forEach((day, idx) => {
+        const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+        if (end <= dayStart || start >= dayEnd) return;
+        for (let h = SCHED_START_HOUR; h < SCHED_END_HOUR; h++) {
+          const hourStart = new Date(day); hourStart.setHours(h, 0, 0, 0);
+          const hourEnd = new Date(day); hourEnd.setHours(h + 1, 0, 0, 0);
+          if (start < hourEnd && end > hourStart) busy[idx].add(h);
+        }
+      });
+    });
+
+    const dayNames = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+    const p = (n) => String(n).padStart(2, "0");
+
+    let html = "<thead><tr><th class=\"time-col\">Время</th>";
+    week.days.forEach((d, idx) => {
+      html += `<th>${p(d.getDate())}.${p(d.getMonth() + 1)}<br>(${dayNames[idx]})</th>`;
+    });
+    html += "</tr></thead><tbody>";
+
+    for (let h = SCHED_START_HOUR; h < SCHED_END_HOUR; h++) {
+      html += `<tr><td class="time-col">${p(h)}:00</td>`;
+      week.days.forEach((d, idx) => {
+        const isBusy = busy[idx].has(h);
+        html += `<td class="${isBusy ? "busy" : "free"}">${isBusy ? "занято" : "своб."}</td>`;
+      });
+      html += "</tr>";
+    }
+    html += "</tbody>";
+    $("schedTable").innerHTML = html;
+  }
+
+  // ---------- НАВИГАЦИЯ ПО ВКЛАДКАМ ----------
+
+  function showTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+    ["lessons", "summary", "students", "schedule"].forEach(t => {
+      $("view-" + t).style.display = t === tab ? "block" : "none";
+    });
+    if (tab === "lessons") { stopPoll(); loadLessonEvents(); }
+    else if (tab === "summary") { stopPoll(); refreshSummary(); loadTrend(); }
+    else if (tab === "students") { stopPoll(); renderStudentsRoster(); }
+    else if (tab === "schedule") { stopPoll(); loadSchedule(); }
+  }
+
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => showTab(tab.dataset.tab));
+  });
+
+  document.querySelectorAll('.subtab[data-lessonmode]').forEach(tab => {
+    tab.addEventListener("click", () => {
+      lessonMode = tab.dataset.lessonmode;
+      document.querySelectorAll('.subtab[data-lessonmode]').forEach(t => t.classList.toggle("active", t === tab));
+      loadLessonEvents();
+    });
+  });
+  document.querySelector('.subtab[data-lessonmode="week"]').classList.add("active");
+
+  document.querySelectorAll('.subtab[data-summode]').forEach(tab => {
+    tab.addEventListener("click", () => {
+      summaryMode = tab.dataset.summode;
+      document.querySelectorAll('.subtab[data-summode]').forEach(t => t.classList.toggle("active", t === tab));
+      refreshSummary();
+    });
+  });
+  document.querySelector('.subtab[data-summode="week"]').classList.add("active");
+
+  $("prevBtn").addEventListener("click", () => {
+    if (lessonMode === "day") dayOffset--; else weekOffset--;
+    loadLessonEvents();
+  });
+  $("nextBtn").addEventListener("click", () => {
+    if (lessonMode === "day") dayOffset++; else weekOffset++;
+    loadLessonEvents();
+  });
+  $("markPastBtn").addEventListener("click", markAllPast);
+
+  $("summaryPrevBtn").addEventListener("click", () => {
+    if (summaryMode === "month") summaryMonthOffset--; else summaryWeekOffset--;
+    refreshSummary();
+  });
+  $("summaryNextBtn").addEventListener("click", () => {
+    if (summaryMode === "month") summaryMonthOffset++; else summaryWeekOffset++;
+    refreshSummary();
+  });
+  $("summaryRangeGoBtn").addEventListener("click", refreshSummary);
+  $("copySummaryBtn").addEventListener("click", copySummary);
+
+  $("schedPrevBtn").addEventListener("click", () => { schedWeekOffset--; loadSchedule(); });
+  $("schedNextBtn").addEventListener("click", () => { schedWeekOffset++; loadSchedule(); });
+
+  $("refreshRatesBtn").addEventListener("click", refreshRates);
+
+  (function initRangeInputs() {
+    const today = new Date();
+    const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
+    $("summaryRangeStart").value = toDateInputValue(weekAgo);
+    $("summaryRangeEnd").value = toDateInputValue(today);
+  })();
+
+  initGis();
+  const stored = loadStoredToken();
+  if (stored) {
+    accessToken = stored;
+    afterAuth();
+  } else {
+    showLoginScreen();
+  }
+})();
+</script>
+</body>
+</html>
