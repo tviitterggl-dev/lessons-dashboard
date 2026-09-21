@@ -271,6 +271,19 @@
     font-weight: 700;
     color: var(--accent);
   }
+  .totals.sub {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .totals.sub .mini-big {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-2);
+  }
   .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 22px 0; }
   .hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
 
@@ -390,6 +403,8 @@
   }
   table.sched td.busy { background: var(--pending-bg); color: var(--pending-text); }
   table.sched td.free { background: var(--done-bg); color: var(--done-text); }
+  table.sched.compact th, table.sched.compact td { padding: 4px 2px; font-size: 10px; }
+  table.sched.compact thead th { padding: 6px 2px; }
 
   .logout-link {
     display: inline-block;
@@ -461,7 +476,11 @@
           <div>Проведено занятий: <b id="doneCount">0</b></div>
           <div>Заработано: <span class="big" id="doneSum">0 ₽</span></div>
         </div>
-        <div class="hint">В сумму идут только отмеченные «Провёл». Если ставка не найдена — впиши сумму вручную, тогда занятие можно отметить. Цена фиксируется в момент отметки — если позже поднимешь ставку, старые занятия не пересчитаются. Отметки хранятся в этом браузере (localStorage) — на другом устройстве или после очистки данных сайта они не видны.</div>
+        <div class="totals sub">
+          <div>Прогноз на весь период (по расписанию): <b id="forecastCount">0</b> зан.</div>
+          <div class="mini-big" id="forecastSum">0 ₽</div>
+        </div>
+        <div class="hint">В сумму «Заработано» идут только отмеченные «Провёл». Прогноз — это сколько выйдет, если пройдут все занятия периода по текущим ставкам (включая уже отмеченные). Если ставка не найдена — впиши сумму вручную, тогда занятие можно отметить. Цена фиксируется в момент отметки — если позже поднимешь ставку, старые занятия не пересчитаются. Отметки хранятся в этом браузере (localStorage) — на другом устройстве или после очистки данных сайта они не видны.</div>
       </div>
     </div>
 
@@ -492,6 +511,10 @@
           <div class="stat-tile"><span class="num" id="statHours">0</span><span class="lbl">часов</span></div>
           <div class="stat-tile"><span class="num" id="statSum">0 ₽</span><span class="lbl">заработано</span></div>
         </div>
+        <div class="totals sub">
+          <div>Прогноз на весь период (по расписанию): <b id="sumForecastCount">0</b> зан.</div>
+          <div class="mini-big" id="sumForecastSum">0 ₽</div>
+        </div>
         <div class="compare-row" id="compareRow"></div>
 
         <div class="btn-row">
@@ -503,9 +526,13 @@
       </div>
 
       <div class="card">
-        <div class="chart-title">Динамика дохода · последние 6 месяцев</div>
+        <div class="chart-title">Динамика дохода</div>
+        <div class="subtabs" style="margin-bottom:10px">
+          <div class="subtab" data-trendmode="week">12 недель</div>
+          <div class="subtab" data-trendmode="month">6 месяцев</div>
+        </div>
         <div id="trendChart"><div class="empty">Загрузка…</div></div>
-        <div class="hint">Только отмеченные «Провёл» занятия, по месяцу проведения.</div>
+        <div class="hint">Только отмеченные «Провёл» занятия, по периоду проведения.</div>
       </div>
     </div>
 
@@ -526,9 +553,12 @@
           <button id="schedNextBtn">›</button>
         </div>
         <div class="sched-wrap">
-          <table class="sched" id="schedTable"></table>
+          <table class="sched compact" id="schedTable"></table>
         </div>
-        <div class="hint">Учтены занятия из календаря «Занятия» и личные события из основного календаря — жёлтое занято, зелёное свободно.</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn secondary block" id="schedExportBtn">Сохранить как картинку (PNG)</button>
+        </div>
+        <div class="hint">Учтены занятия из календаря «Занятия» и личные события из основного календаря — жёлтое занято, зелёное свободно. Картинку удобно скинуть клиенту, чтобы он выбрал окно.</div>
       </div>
     </div>
   </div>
@@ -970,6 +1000,18 @@
     updateTotals();
   }
 
+  // Прогноз: сколько выйдет, если пройдут ВСЕ занятия периода (отмеченные и ещё нет)
+  // по текущим ставкам — в отличие от "заработано", которое считает только отмеченные.
+  function computeForecast(evs) {
+    let count = 0, sum = 0;
+    evs.forEach(ev => {
+      const mark = marks[ev.id];
+      const amount = effectiveAmountFor(ev, mark);
+      if (amount != null && !Number.isNaN(amount)) { count++; sum += amount; }
+    });
+    return { count, sum };
+  }
+
   function updateTotals() {
     let count = 0, sum = 0;
     events.forEach(ev => {
@@ -981,6 +1023,10 @@
     });
     $("doneCount").textContent = String(count);
     $("doneSum").textContent = sum.toLocaleString("ru-RU") + " ₽";
+
+    const forecast = computeForecast(events);
+    $("forecastCount").textContent = String(forecast.count);
+    $("forecastSum").textContent = forecast.sum.toLocaleString("ru-RU") + " ₽";
   }
 
   function stopPoll() {
@@ -1053,6 +1099,10 @@
       const stats = computeStats(summaryEvents);
       lastStats = { range, stats };
       renderSummary(stats);
+
+      const forecast = computeForecast(summaryEvents);
+      $("sumForecastCount").textContent = String(forecast.count);
+      $("sumForecastSum").textContent = forecast.sum.toLocaleString("ru-RU") + " ₽";
 
       const prevRange = getPrevSummaryRange(range);
       const prevEvents = await fetchRangeEvents(prevRange);
@@ -1169,54 +1219,80 @@
     loadSummary();
   }
 
-  // ---------- ДИНАМИКА ДОХОДА (график по месяцам) ----------
+  // ---------- ДИНАМИКА ДОХОДА (график: недели/месяцы) ----------
+
+  let trendMode = "month"; // week | month
+
+  function buildTrendBuckets() {
+    const now = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    if (trendMode === "week") {
+      const thisMonday = mondayOf(now);
+      const buckets = [];
+      for (let i = 11; i >= 0; i--) {
+        const mon = new Date(thisMonday);
+        mon.setDate(mon.getDate() - i * 7);
+        buckets.push({ key: mon.getTime(), label: `${p(mon.getDate())}.${p(mon.getMonth() + 1)}`, sum: 0 });
+      }
+      return { buckets, rangeStart: new Date(buckets[0].key) };
+    }
+    const buckets = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ key: d.getFullYear() + "-" + d.getMonth(), label: MONTHS_SHORT_RU[d.getMonth()], sum: 0 });
+    }
+    const first = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    return { buckets, rangeStart: first };
+  }
+
+  function bucketKeyFor(date) {
+    if (trendMode === "week") return mondayOf(date).getTime();
+    return date.getFullYear() + "-" + date.getMonth();
+  }
 
   async function loadTrend() {
     const el = $("trendChart");
     el.innerHTML = '<div class="empty">Загрузка…</div>';
 
-    const now = new Date();
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push({ year: d.getFullYear(), month: d.getMonth(), label: MONTHS_SHORT_RU[d.getMonth()], sum: 0 });
-    }
-    const rangeStart = new Date(months[0].year, months[0].month, 1);
-    const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const { buckets, rangeStart } = buildTrendBuckets();
+    const rangeEnd = new Date();
+    rangeEnd.setDate(rangeEnd.getDate() + 1);
 
     try {
       const evs = await calendarFetch(LESSONS_CALENDAR_ID, fmtISO(rangeStart), fmtISO(rangeEnd));
       loadMarksFor(evs.map(e => e.id));
+      const byKey = {};
+      buckets.forEach(b => { byKey[b.key] = b; });
       evs.forEach(ev => {
         const mark = marks[ev.id];
         if (!mark || !mark.marked) return;
         const start = new Date(ev.start.dateTime || ev.start.date);
         const amount = effectiveAmountFor(ev, mark);
         if (amount == null || Number.isNaN(amount)) return;
-        const bucket = months.find(m => m.year === start.getFullYear() && m.month === start.getMonth());
+        const bucket = byKey[bucketKeyFor(start)];
         if (bucket) bucket.sum += amount;
       });
-      renderTrendChart(months);
+      renderTrendChart(buckets);
     } catch (e) {
       if (e.message !== "auth") el.innerHTML = '<div class="empty">Не удалось загрузить</div>';
     }
   }
 
-  function renderTrendChart(months) {
+  function renderTrendChart(buckets) {
     const el = $("trendChart");
-    const max = Math.max(1, ...months.map(m => m.sum));
-    const w = 320, h = 150, padTop = 20, padBottom = 26, gap = 10;
-    const barW = (w - gap * (months.length + 1)) / months.length;
+    const max = Math.max(1, ...buckets.map(m => m.sum));
+    const w = Math.max(320, buckets.length * 30), h = 150, padTop = 20, padBottom = 26, gap = 8;
+    const barW = (w - gap * (buckets.length + 1)) / buckets.length;
 
     let svg = "";
-    months.forEach((m, i) => {
+    buckets.forEach((m, i) => {
       const barH = m.sum > 0 ? Math.max(2, (m.sum / max) * (h - padTop - padBottom)) : 0;
       const x = gap + i * (barW + gap);
       const y = h - padBottom - barH;
       const valLabel = m.sum > 0 ? (m.sum >= 1000 ? Math.round(m.sum / 100) / 10 + "k" : String(Math.round(m.sum))) : "";
       svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="4"></rect>`;
-      svg += `<text class="val" x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-size="9.5">${valLabel}</text>`;
-      svg += `<text x="${(x + barW / 2).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="9.5">${m.label}</text>`;
+      svg += `<text class="val" x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-size="9">${valLabel}</text>`;
+      svg += `<text x="${(x + barW / 2).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="8.5">${m.label}</text>`;
     });
 
     el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;">${svg}</svg>`;
@@ -1318,6 +1394,68 @@
     $("schedTable").innerHTML = html;
   }
 
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[data-src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement("script");
+      s.src = src;
+      s.dataset.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("script load failed"));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function exportScheduleImage() {
+    const btn = $("schedExportBtn");
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Готовлю картинку…";
+    try {
+      if (typeof html2canvas === "undefined") {
+        await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+      }
+      const cardBg = getComputedStyle(document.documentElement).getPropertyValue("--card-bg").trim() || "#fffdfa";
+      const textColor = getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#2b211a";
+
+      const wrap = document.createElement("div");
+      wrap.style.position = "fixed";
+      wrap.style.left = "-9999px";
+      wrap.style.top = "0";
+      wrap.style.padding = "18px";
+      wrap.style.background = cardBg;
+      wrap.style.width = "fit-content";
+      wrap.style.fontFamily = "Inter, -apple-system, sans-serif";
+
+      const title = document.createElement("div");
+      title.style.fontFamily = "'Space Grotesk', sans-serif";
+      title.style.fontWeight = "700";
+      title.style.fontSize = "16px";
+      title.style.color = textColor;
+      title.style.marginBottom = "10px";
+      title.textContent = "Свободные окна: " + $("schedLabel").textContent;
+      wrap.appendChild(title);
+
+      const tableClone = $("schedTable").cloneNode(true);
+      tableClone.style.minWidth = "0";
+      wrap.appendChild(tableClone);
+
+      document.body.appendChild(wrap);
+      const canvas = await html2canvas(wrap, { backgroundColor: cardBg, scale: 2 });
+      document.body.removeChild(wrap);
+
+      const link = document.createElement("a");
+      link.download = "raspisanie.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (e) {
+      alert("Не удалось сохранить картинку, попробуй ещё раз");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  }
+
   // ---------- НАВИГАЦИЯ ПО ВКЛАДКАМ ----------
 
   function showTab(tab) {
@@ -1354,6 +1492,15 @@
   });
   document.querySelector('.subtab[data-summode="week"]').classList.add("active");
 
+  document.querySelectorAll('.subtab[data-trendmode]').forEach(tab => {
+    tab.addEventListener("click", () => {
+      trendMode = tab.dataset.trendmode;
+      document.querySelectorAll('.subtab[data-trendmode]').forEach(t => t.classList.toggle("active", t === tab));
+      loadTrend();
+    });
+  });
+  document.querySelector('.subtab[data-trendmode="month"]').classList.add("active");
+
   $("prevBtn").addEventListener("click", () => {
     if (lessonMode === "day") dayOffset--; else weekOffset--;
     loadLessonEvents();
@@ -1377,6 +1524,7 @@
 
   $("schedPrevBtn").addEventListener("click", () => { schedWeekOffset--; loadSchedule(); });
   $("schedNextBtn").addEventListener("click", () => { schedWeekOffset++; loadSchedule(); });
+  $("schedExportBtn").addEventListener("click", exportScheduleImage);
 
   $("refreshRatesBtn").addEventListener("click", refreshRates);
 
