@@ -1444,10 +1444,26 @@
       const canvas = await html2canvas(wrap, { backgroundColor: cardBg, scale: 2 });
       document.body.removeChild(wrap);
 
-      const link = document.createElement("a");
-      link.download = "raspisanie.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      const blobUrl = URL.createObjectURL(blob);
+
+      const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS) {
+        // iOS Safari игнорирует атрибут download для data:/blob: ссылок и вместо
+        // сохранения картинки может скачать невнятный файл. Поэтому открываем
+        // картинку в новой вкладке — там можно зажать палец и «Добавить в Фото».
+        window.open(blobUrl, "_blank");
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        alert("Открыл картинку в новой вкладке — зажми на ней палец и выбери «Добавить в Фото» (или «Сохранить в Файлы»).");
+      } else {
+        const link = document.createElement("a");
+        link.download = "raspisanie.png";
+        link.href = blobUrl;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      }
     } catch (e) {
       alert("Не удалось сохранить картинку, попробуй ещё раз");
     } finally {
