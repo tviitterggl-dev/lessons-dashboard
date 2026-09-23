@@ -369,6 +369,23 @@
   .student-row .cls { font-size: 11.5px; color: var(--muted); }
   .student-row .rate { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--accent-2); font-size: 14px; }
 
+  .pkg-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: var(--accent-soft);
+  }
+  .pkg-card:last-child { margin-bottom: 0; }
+  .pkg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .pkg-name { font-weight: 700; font-size: 14px; }
+  .pkg-progress-text { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .pkg-bar { height: 8px; border-radius: 6px; background: var(--border); overflow: hidden; margin: 2px 0 8px; }
+  .pkg-bar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
+  .pkg-money { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  .pkg-money .earned { color: var(--accent-2); font-weight: 600; }
+  .pkg-money .left { color: var(--muted); }
+
   .chart-title { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 13px; margin-bottom: 10px; color: var(--text); }
   #trendChart svg rect { fill: var(--accent); }
   #trendChart svg text { fill: var(--muted); font-family: "Inter", sans-serif; }
@@ -538,6 +555,11 @@
 
     <!-- УЧЕНИКИ -->
     <div class="tabview" id="view-students" style="display:none">
+      <div class="card">
+        <div class="sub" style="margin-bottom:10px">Пакеты (предоплата)</div>
+        <div id="packagesList"><div class="empty">Загрузка…</div></div>
+        <div class="hint">Считается по занятиям с номером пакета в названии («N/M» в конце). «Отработано» — по отметкам «Провёл», остальное — ещё не отработанная предоплата по текущей ставке.</div>
+      </div>
       <div class="card">
         <div id="studentsRosterList"><div class="empty">Загрузка…</div></div>
         <div class="hint">Список и ставки из таблицы «Ставки учеников». Обновляется кнопкой «Обновить цены» сверху.</div>
@@ -778,6 +800,15 @@
   function studentKey(ev) {
     const parsed = parseLesson(ev.summary || "");
     return parsed ? `${parsed.name}, ${parsed.cls} класс` : (ev.summary || "Без названия");
+  }
+  // Номер занятия в пакете: заголовок вида "Сева 7 класс 3/8" -> {current:3, total:8}
+  function parsePackage(summary) {
+    const m = (summary || "").match(/(\d{1,2})\s*\/\s*(\d{1,2})\s*$/);
+    if (!m) return null;
+    const current = parseInt(m[1], 10);
+    const total = parseInt(m[2], 10);
+    if (!total || !current || current > total) return null;
+    return { current, total };
   }
 
   // overrideAmount всегда побеждает; иначе, если занятие уже отмечено —
@@ -1300,6 +1331,100 @@
 
   // ---------- УЧЕНИКИ ----------
 
+  // Разбираем занятия с суффиксом "N/M" в названии, группируем по ученику,
+  // делим на циклы (новый цикл — когда номер не больше предыдущего в
+  // хронологии), берём последний цикл как текущий активный пакет.
+  function computePackages(evs) {
+    const withPkg = evs
+      .map(ev => {
+        const pkg = parsePackage(ev.summary || "");
+        const parsed = parseLesson(ev.summary || "");
+        if (!pkg || !parsed) return null;
+        const start = new Date(ev.start.dateTime || ev.start.date);
+        return { ev, pkg, parsed, start, key: studentKey(ev) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start);
+
+    const byStudent = {};
+    withPkg.forEach(item => {
+      (byStudent[item.key] = byStudent[item.key] || []).push(item);
+    });
+
+    const packages = [];
+    Object.keys(byStudent).forEach(key => {
+      const items = byStudent[key];
+      const cycles = [];
+      let cur = [];
+      let prevNum = 0;
+      items.forEach(item => {
+        if (item.pkg.current <= prevNum && cur.length) { cycles.push(cur); cur = []; }
+        cur.push(item);
+        prevNum = item.pkg.current;
+      });
+      if (cur.length) cycles.push(cur);
+      if (!cycles.length) return;
+
+      const activeCycle = cycles[cycles.length - 1];
+      const total = Math.max(...activeCycle.map(i => i.pkg.total));
+      const rate = findRate(activeCycle[0].parsed.name, activeCycle[0].parsed.cls);
+
+      let doneCount = 0, doneSum = 0;
+      activeCycle.forEach(item => {
+        const mark = marks[item.ev.id];
+        if (mark && mark.marked) {
+          doneCount++;
+          const amount = effectiveAmountFor(item.ev, mark);
+          if (amount != null && !Number.isNaN(amount)) doneSum += amount;
+        }
+      });
+      const remaining = Math.max(0, total - doneCount);
+      const unearned = rate != null ? remaining * rate : null;
+
+      packages.push({ key, total, doneCount, remaining, doneSum, unearned, rate });
+    });
+
+    return packages.sort((a, b) => a.key.localeCompare(b.key, "ru"));
+  }
+
+  function renderPackages(packages) {
+    const list = $("packagesList");
+    if (!packages.length) {
+      list.innerHTML = '<div class="empty">Нет учеников с пакетами (в названии занятия должен быть номер вида «3/8»)</div>';
+      return;
+    }
+    list.innerHTML = packages.map(p => {
+      const pct = Math.max(0, Math.min(100, Math.round((p.doneCount / p.total) * 100)));
+      const moneyLine = p.rate != null
+        ? `<div class="pkg-money"><span class="earned">${p.doneSum.toLocaleString("ru-RU")} ₽ отработано</span><span class="left">не отработано ещё: ~${p.unearned.toLocaleString("ru-RU")} ₽</span></div>`
+        : `<div class="pkg-money"><span class="left">ставка не найдена — сумма не посчитана</span></div>`;
+      return `
+        <div class="pkg-card">
+          <div class="pkg-head">
+            <div class="pkg-name">${p.key}</div>
+            <div class="pkg-progress-text">${p.doneCount} из ${p.total}, осталось ${p.remaining}</div>
+          </div>
+          <div class="pkg-bar"><div class="pkg-bar-fill" style="width:${pct}%"></div></div>
+          ${moneyLine}
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function loadPackages() {
+    $("packagesList").innerHTML = '<div class="empty">Загрузка…</div>';
+    const now = new Date();
+    const start = new Date(now); start.setDate(start.getDate() - 21);
+    const end = new Date(now); end.setDate(end.getDate() + 240);
+    try {
+      const evs = await calendarFetch(LESSONS_CALENDAR_ID, fmtISO(start), fmtISO(end));
+      loadMarksFor(evs.map(e => e.id));
+      renderPackages(computePackages(evs));
+    } catch (e) {
+      if (e.message !== "auth") $("packagesList").innerHTML = '<div class="empty">Не удалось загрузить пакеты</div>';
+    }
+  }
+
   function renderStudentsRoster() {
     const list = $("studentsRosterList");
     if (!rates.length) {
@@ -1482,7 +1607,7 @@
     });
     if (tab === "lessons") { stopPoll(); loadLessonEvents(); }
     else if (tab === "summary") { stopPoll(); refreshSummary(); loadTrend(); }
-    else if (tab === "students") { stopPoll(); renderStudentsRoster(); }
+    else if (tab === "students") { stopPoll(); renderStudentsRoster(); loadPackages(); }
     else if (tab === "schedule") { stopPoll(); loadSchedule(); }
   }
 
